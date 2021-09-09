@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.regex.Matcher;
 
 import static org.yorymotoru.api.RosdistantURLs.*;
 
@@ -23,6 +24,8 @@ public class RosdistantConnection {
 
     private String login;
     private String password;
+
+    private final char sh = '\\';
 
     public RosdistantConnection(String login, String password) {
         this.login = login;
@@ -57,29 +60,32 @@ public class RosdistantConnection {
             result = Request.Get(ROSDISTANT_SCHEDULE)
                     .execute().returnContent();
 
-             System.out.println(result);
+            //System.out.println(result);
 
             Document document = Jsoup.parse(result.asString(), ROSDISTANT_HOME);
             Elements table = document.select("#region-main > div > div > table");
-            Elements rows = table.select("tr");
-
             String[] dates = new String[6];
 
-            for (int i = 0; i < rows.size(); i++) {
-                Element row = rows.get(i); // По номеру индекса получает строку
-                if (i == 0) {
-                    // Обработка заголовка
-                    Elements cols = row.select(("th"));
-                    for (int ii = 1; ii < cols.size(); ii++) {
-                        String s = cols.get(ii).select("h4 > a").text();
-                        s = s.substring(s.length() - 10);
-                        String[] ss = s.split("\\.");
-                        s = ss[2] + ss[1] + ss[0];
-                        dates[ii - 1] = s;
-                    }
+            Elements rows = table.select("tbody");
+            Elements heads = table.select("thead");
 
-                } else {
-                    Elements cols = row.select("td"); // Разбиваем полученную строку по тегу  на столбы
+            for (int i = 0; i < heads.size(); i++) {
+                Element head = heads.get(i);
+                Element row = rows.get(i + 1);
+
+                Elements cols = head.select(("tr > th"));
+                for (int ii = 1; ii < cols.size(); ii++) {
+                    String s = cols.get(ii).select("h4 > a").text();
+                    s = s.substring(s.length() - 10);
+                    String[] ss = s.split("\\.");
+                    s = ss[2] + ss[1] + ss[0];
+                    dates[ii - 1] = s;
+                }
+
+                Elements rws = row.select("tr");
+                for (int j = 0; j < rws.size(); j++) {
+                    cols = rws.get(j).select("td");
+
                     int sn = Integer.parseInt(cols.get(0).select("h5 > p").text());
                     for (int ii = 1; ii < cols.size(); ii++) {
                         String s = cols.get(ii).select("h5 > p").text();
@@ -88,7 +94,19 @@ public class RosdistantConnection {
 
                             p.setSummary(s.split("Тип:")[0]);
                             p.setDescription("Тип:" + s.split("Тип:")[1]);
-                            p.setLocation(s.split("Аудитория:")[1].split("Ссылка")[0]);
+                            if (cols.get(ii).select("h5 > p > a").size() > 0) {
+                                p.setLink(cols.get(ii).select("h5 > p > a").first().attr("href"));
+                                p.setDescription(p.getDescription().replaceAll("перейти ", Matcher.quoteReplacement(p.getLink() + "\\n")));
+                            }
+
+                            p.setDescription(p.getDescription().replaceAll("Преподаватель:", Matcher.quoteReplacement("\\nПреподаватель:")));
+                            p.setDescription(p.getDescription().replaceAll("Аудитория:", Matcher.quoteReplacement("\\nАудитория:")));
+                            p.setDescription(p.getDescription().replaceAll("Мероприятие:", Matcher.quoteReplacement("\\nМероприятие:")));
+                            p.setDescription(p.getDescription().replaceAll("Подгруппа:", Matcher.quoteReplacement("\\nПодгруппа:")));
+                            p.setDescription(p.getDescription().replaceAll("Ссылка на мероприятие появится позднее. ",
+                                    Matcher.quoteReplacement("\\nСсылка на мероприятие появится позднее. \\n")));
+
+                            p.setLocation(s.split("Аудитория:")[1].split("Ссылка|Мероприятие")[0]);
                             //TODO: Надо переписать под обычный формат времени
                             p.setStartTime(dates[ii - 1] + "T" + DT_START[sn - 1]);
                             p.setEndTime(dates[ii - 1] + "T" + DT_END[sn - 1]);
