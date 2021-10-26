@@ -34,9 +34,15 @@ public class RosdistantConnection {
         try {
             Content result = null;
 
+            result = Request.Get(ROSDISTANT_HOME)
+                    .execute().returnContent();
+            Document document = Jsoup.parse(result.asString(), ROSDISTANT_HOME);
+            Elements field = document.select("#block-login > input[type=hidden]:nth-child(3)");
+
             final Collection<NameValuePair> paramsForLogin = new ArrayList<>();
             paramsForLogin.add(new BasicNameValuePair("username", login));
             paramsForLogin.add(new BasicNameValuePair("password", password));
+            paramsForLogin.add(new BasicNameValuePair("logintoken", field.attr("value")));
             paramsForLogin.add(new BasicNameValuePair("submit", ""));
 
             result = Request.Post(ROSDISTANT_LOGIN)
@@ -92,7 +98,6 @@ public class RosdistantConnection {
                         if (!s.equals("")) {
                             Practice p = new Practice();
 
-                            p.setSummary(s.split("Тип:")[0]);
                             p.setDescription("Тип:" + s.split("Тип:")[1]);
                             if (cols.get(ii).select("h5 > p > a").size() > 0) {
                                 p.setLink(cols.get(ii).select("h5 > p > a").first().attr("href"));
@@ -106,6 +111,8 @@ public class RosdistantConnection {
                             p.setDescription(p.getDescription().replaceAll("Ссылка на мероприятие появится позднее. ",
                                     Matcher.quoteReplacement("\\nСсылка на мероприятие появится позднее. \\n")));
 
+                            p.setType(p.getDescription().split("Тип: ")[1].split(Matcher.quoteReplacement("\\n"))[0].trim());
+                            p.setSummary(p.getType() + ": " + s.split("Тип:")[0]);
                             p.setLocation(s.split("Аудитория:")[1].split("Ссылка|Мероприятие")[0]);
                             //TODO: Надо переписать под обычный формат времени
                             p.setStartTime(dates[ii - 1] + "T" + DT_START[sn - 1]);

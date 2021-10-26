@@ -35,6 +35,10 @@ public class Practice {
     @Setter
     private String link;
 
+    @Getter
+    @Setter
+    private String type;
+
     public String getVElement() {
         return "BEGIN:VEVENT\n" +
                 "UID:" + uid + "\n" +
