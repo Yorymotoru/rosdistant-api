@@ -1,2 +1,4 @@
 # Project exclude paths
 /target/
+/src/main/java/Main.java
+/schedule.ics
